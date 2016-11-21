@@ -95,7 +95,8 @@ void go(unsigned _depth, Executive& _e, OnOpFunc const& _onOp)
 
 bool ExtVM::call(CallParameters& _p)
 {
-	Executive e(m_s, envInfo(), m_sealEngine, depth + 1);
+	m_successfulCalls.emplace_back(m_s, envInfo(), m_sealEngine, depth + 1);
+	auto& e = m_successfulCalls.back();
 	if (!e.call(_p, gasPrice, origin))
 	{
 		go(depth, e, _p.onOp);
@@ -103,12 +104,27 @@ bool ExtVM::call(CallParameters& _p)
 	}
 	_p.gas = e.gas();
 
-	return !e.excepted();
+	if (e.excepted())
+	{
+		m_successfulCalls.pop_back();
+		return false;
+	}
+	return true;
 }
 
 size_t ExtVM::codeSizeAt(dev::Address _a)
 {
 	return m_s.codeSize(_a);
+}
+
+void ExtVM::setStore(u256 _n, u256 _v)
+{
+	if (!m_origStorage.count(_n))
+	{
+		m_origStorage.emplace(_n, store(_n));
+		clog(ExecutiveWarnChannel) << "ORIG STORAGE " << (int)myAddress[19] << _n << _v;
+	}
+	m_s.setStorage(myAddress, _n, _v);
 }
 
 h160 ExtVM::create(u256 _endowment, u256& io_gas, bytesConstRef _code, OnOpFunc const& _onOp)
@@ -121,4 +137,26 @@ h160 ExtVM::create(u256 _endowment, u256& io_gas, bytesConstRef _code, OnOpFunc 
 	}
 	io_gas = e.gas();
 	return e.newAddress();
+}
+
+void ExtVM::revert()
+{
+	clog(ExecutiveWarnChannel) << "Reverting " << (int) myAddress[19];
+	for (auto it = m_successfulCalls.rbegin();
+	     it != m_successfulCalls.rend(); ++it)
+	{
+		it->revert();
+	}
+
+	// Restore original storage for this account. The order does not matter.
+	clog(ExecutiveWarnChannel) << "Reverting storage " << (int) myAddress[19];
+	for (auto& item: m_origStorage)
+	{
+		m_s.setStorage(myAddress, item.first, item.second);
+		clog(ExecutiveWarnChannel) << "REVERT STORAGE " << (int)myAddress[19] << item.first << item.second;
+	}
+
+	// Drop substate.
+	sub.clear();
+	clog(ExecutiveWarnChannel) << "Reverted storage " << (int)myAddress[19];
 }

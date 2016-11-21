@@ -282,6 +282,7 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 		m_gas = _p.gas;
 		if (m_s.addressHasCode(_p.codeAddress))
 		{
+			clog(ExecutiveWarnChannel) << "Call " << (int)_p.receiveAddress[19];
 			m_outRef = _p.out; // Save ref to expected output buffer to be used in go()
 			bytes const& c = m_s.code(_p.codeAddress);
 			h256 codeHash = m_s.codeHash(_p.codeAddress);
@@ -289,7 +290,18 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 		}
 	}
 
-	m_s.transferBalance(_p.senderAddress, _p.receiveAddress, _p.valueTransfer);
+	if (_p.valueTransfer)
+	{
+		// Remember the transfer params in case revert is needed.
+		m_sender = _p.senderAddress;
+		m_receiver = _p.receiveAddress;
+		m_valueTransfer = _p.valueTransfer;
+
+		// Transfer ether.
+		clog(ExecutiveWarnChannel) << "Transfer " <<  m_sender << m_receiver << m_valueTransfer;
+		m_s.transferBalance(_p.senderAddress, _p.receiveAddress, _p.valueTransfer);
+	}
+
 
 	return !m_ext;
 }
@@ -311,7 +323,16 @@ bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _g
 
 	bool incrementNonce = m_envInfo.number() >= m_sealEngine.chainParams().u256Param("EIP158ForkBlock");
 	m_s.createContract(m_newAddress, incrementNonce);
-	m_s.transferBalance(_sender, m_newAddress, _endowment);
+	if (_endowment)
+	{
+		// Remember the transfer params in case revert is needed.
+		m_sender = _sender;
+		m_receiver = m_newAddress;
+		m_valueTransfer = _endowment;
+
+		// Transfer ether.
+		m_s.transferBalance(_sender, m_newAddress, _endowment);
+	}
 
 	if (_init.empty())
 		m_s.setCode(m_newAddress, {});
@@ -397,10 +418,7 @@ bool Executive::go(OnOpFunc const& _onOp)
 			clog(StateSafeExceptions) << "Safe VM Exception. " << diagnostic_information(_e);
 			m_gas = 0;
 			m_excepted = toTransactionException(_e);
-			m_ext->revert();
-
-			if (m_isCreation)
-				m_newAddress = Address();
+			revert();
 		}
 		catch (Exception const& _e)
 		{
@@ -461,5 +479,22 @@ void Executive::finalize()
 		m_res->excepted = m_excepted; // TODO: m_except is used only in ExtVM::call
 		m_res->newAddress = m_newAddress;
 		m_res->gasRefunded = m_ext ? m_ext->sub.refunds : 0;
+	}
+}
+
+void Executive::revert()
+{
+//	clog(ExecutiveWarnChannel) << "Reverting call" << (int)m_ext->myAddress[19];
+	if (m_ext)
+		m_ext->revert();
+	if (m_valueTransfer)
+	{
+		m_s.transferBalance(m_receiver, m_sender, m_valueTransfer);
+		clog(ExecutiveWarnChannel) << "Revert Transfer " << m_receiver << m_sender << m_valueTransfer;
+	}
+	if (m_isCreation)
+	{
+		m_s.kill(m_newAddress);
+		m_newAddress = {};
 	}
 }
