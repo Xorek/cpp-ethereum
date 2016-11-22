@@ -257,6 +257,9 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 {
 	m_isCreation = false;
 
+	// Always remember the sender, needed for revert.
+	m_sender = _p.senderAddress;
+
 	// If external transaction.
 	if (m_t)
 		// Increment associated nonce for sender.
@@ -282,7 +285,7 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 		m_gas = _p.gas;
 		if (m_s.addressHasCode(_p.codeAddress))
 		{
-			clog(ExecutiveWarnChannel) << "Call " << (int)_p.receiveAddress[19];
+			clog(ExecutiveWarnChannel) << "Call " << _p.receiveAddress;
 			m_outRef = _p.out; // Save ref to expected output buffer to be used in go()
 			bytes const& c = m_s.code(_p.codeAddress);
 			h256 codeHash = m_s.codeHash(_p.codeAddress);
@@ -293,13 +296,12 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 	if (_p.valueTransfer)
 	{
 		// Remember the transfer params in case revert is needed.
-		m_sender = _p.senderAddress;
 		m_receiver = _p.receiveAddress;
 		m_valueTransfer = _p.valueTransfer;
 
 		// Transfer ether.
 		clog(ExecutiveWarnChannel) << "Transfer " <<  m_sender << m_receiver << m_valueTransfer;
-		m_s.transferBalance(_p.senderAddress, _p.receiveAddress, _p.valueTransfer);
+		m_s.transferBalance(m_sender, m_receiver, m_valueTransfer);
 	}
 
 
@@ -309,6 +311,10 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _gas, bytesConstRef _init, Address _origin)
 {
 	m_isCreation = true;
+
+	// Always remember the sender, needed for revert.
+	m_sender = _sender;
+
 	u256 nonce = m_s.getNonce(_sender);
 	m_s.incNonce(_sender);
 
@@ -326,17 +332,17 @@ bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _g
 	if (_endowment)
 	{
 		// Remember the transfer params in case revert is needed.
-		m_sender = _sender;
-		m_receiver = m_newAddress;
+		m_receiver = m_newAddress;  // FIXME: Merge m_receiver and m_newAddress
 		m_valueTransfer = _endowment;
 
 		// Transfer ether.
-		m_s.transferBalance(_sender, m_newAddress, _endowment);
+		m_s.transferBalance(m_sender, m_receiver, m_valueTransfer);
 	}
 
 	if (_init.empty())
 		m_s.setCode(m_newAddress, {});
 
+	clog(ExecutiveWarnChannel) << "Create " << m_sender << m_newAddress;
 	return !m_ext;
 }
 
@@ -418,7 +424,7 @@ bool Executive::go(OnOpFunc const& _onOp)
 			clog(StateSafeExceptions) << "Safe VM Exception. " << diagnostic_information(_e);
 			m_gas = 0;
 			m_excepted = toTransactionException(_e);
-			revert();
+			revert(revertNonce);
 		}
 		catch (Exception const& _e)
 		{
@@ -482,18 +488,26 @@ void Executive::finalize()
 	}
 }
 
-void Executive::revert()
+void Executive::revert(NonceRevertPolicy _nonceRevertPolicy)
 {
 //	clog(ExecutiveWarnChannel) << "Reverting call" << (int)m_ext->myAddress[19];
 	if (m_ext)
 		m_ext->revert();
 	if (m_valueTransfer)
 	{
+		// FIXME: In case of CREATE, not need to revert transfer and storage,
+		// as we are going to kill the whole account.
 		m_s.transferBalance(m_receiver, m_sender, m_valueTransfer);
 		clog(ExecutiveWarnChannel) << "Revert Transfer " << m_receiver << m_sender << m_valueTransfer;
 	}
 	if (m_isCreation)
 	{
+		auto n = m_s.getNonce(m_sender);
+		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
+		if (_nonceRevertPolicy == revertNonce)
+			m_s.setNonce(m_sender, n - 1);
+		n = m_s.getNonce(m_sender);
+		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
 		m_s.kill(m_newAddress);
 		m_newAddress = {};
 	}
