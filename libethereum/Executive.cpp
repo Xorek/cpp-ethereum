@@ -293,16 +293,14 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 		}
 	}
 
-	if (_p.valueTransfer)
-	{
-		// Remember the transfer params in case revert is needed.
-		m_receiver = _p.receiveAddress;
-		m_valueTransfer = _p.valueTransfer;
+	// Remember the transfer params in case revert is needed.
+	m_receiver = _p.receiveAddress;
+	m_valueTransfer = _p.valueTransfer;
+	m_receiverExisted = m_s.addressInUse(m_receiver);
 
-		// Transfer ether.
-		clog(ExecutiveWarnChannel) << "Transfer " <<  m_sender << m_receiver << m_valueTransfer;
-		m_s.transferBalance(m_sender, m_receiver, m_valueTransfer);
-	}
+	// Transfer ether.
+	clog(ExecutiveWarnChannel) << "Transfer " <<  m_sender << m_receiver << m_valueTransfer;
+	m_s.transferBalance(m_sender, _p.receiveAddress, _p.valueTransfer);
 
 
 	return !m_ext;
@@ -329,20 +327,18 @@ bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _g
 
 	bool incrementNonce = m_envInfo.number() >= m_sealEngine.chainParams().u256Param("EIP158ForkBlock");
 	m_s.createContract(m_newAddress, incrementNonce);
-	if (_endowment)
-	{
-		// Remember the transfer params in case revert is needed.
-		m_receiver = m_newAddress;  // FIXME: Merge m_receiver and m_newAddress
-		m_valueTransfer = _endowment;
 
-		// Transfer ether.
-		m_s.transferBalance(m_sender, m_receiver, m_valueTransfer);
-	}
+	// Remember the transfer params in case revert is needed.
+	m_receiver = m_newAddress;  // FIXME: Merge m_receiver and m_newAddress
+	m_valueTransfer = _endowment;
+
+	// Transfer ether.
+	m_s.transferBalance(m_sender, m_receiver, m_valueTransfer);
 
 	if (_init.empty())
 		m_s.setCode(m_newAddress, {});
 
-	clog(ExecutiveWarnChannel) << "Create " << m_sender << m_newAddress;
+	clog(ExecutiveWarnChannel) << "Create " << m_sender << m_newAddress << m_valueTransfer;
 	return !m_ext;
 }
 
@@ -424,7 +420,7 @@ bool Executive::go(OnOpFunc const& _onOp)
 			clog(StateSafeExceptions) << "Safe VM Exception. " << diagnostic_information(_e);
 			m_gas = 0;
 			m_excepted = toTransactionException(_e);
-			revert(revertNonce);
+			revert(keepNonce);
 		}
 		catch (Exception const& _e)
 		{
@@ -511,4 +507,8 @@ void Executive::revert(NonceRevertPolicy _nonceRevertPolicy)
 		m_s.kill(m_newAddress);
 		m_newAddress = {};
 	}
+	// FIXME:
+	else if (!m_receiverExisted)
+//		m_s.kill(m_receiver);
+		assert(false);
 }

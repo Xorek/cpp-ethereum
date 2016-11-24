@@ -129,13 +129,19 @@ void ExtVM::setStore(u256 _n, u256 _v)
 
 h160 ExtVM::create(u256 _endowment, u256& io_gas, bytesConstRef _code, OnOpFunc const& _onOp)
 {
-	Executive e(m_s, envInfo(), m_sealEngine, depth + 1);
+	// Every CREATE increases this account nonce, no matter if it succeeds.
+	++m_nonceInc;
+
+	m_successfulCalls.emplace_back(m_s, envInfo(), m_sealEngine, depth + 1);
+	auto& e = m_successfulCalls.back();
 	if (!e.create(myAddress, _endowment, gasPrice, io_gas, _code, origin))
 	{
 		go(depth, e, _onOp);
 		e.accrueSubState(sub);
 	}
 	io_gas = e.gas();
+	if (!e.newAddress())
+		m_successfulCalls.pop_back();
 	return e.newAddress();
 }
 
@@ -143,7 +149,7 @@ void ExtVM::revert()
 {
 	clog(ExecutiveWarnChannel) << "Reverting " << myAddress;
 	for (auto it = m_successfulCalls.rbegin(); it != m_successfulCalls.rend(); ++it)
-		it->revert(revertNonce);
+		it->revert(keepNonce);
 
 	// Restore original storage for this account. The order does not matter.
 	clog(ExecutiveWarnChannel) << "Reverting storage " << myAddress;
@@ -151,6 +157,13 @@ void ExtVM::revert()
 	{
 		m_s.setStorage(myAddress, item.first, item.second);
 		clog(ExecutiveWarnChannel) << "REVERT STORAGE " << myAddress << item.first << item.second;
+	}
+
+	while (m_nonceInc)
+	{
+		clog(ExecutiveWarnChannel) << "REVERT Nonce " << myAddress << m_nonceInc;
+		m_s.revertIncNonce(myAddress);
+		--m_nonceInc;
 	}
 
 	// Drop substate.
