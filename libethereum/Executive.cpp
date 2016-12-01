@@ -296,7 +296,11 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 	// Remember the transfer params in case revert is needed.
 	m_receiver = _p.receiveAddress;
 	m_valueTransfer = _p.valueTransfer;
-	m_receiverExisted = m_s.addressInUse(m_receiver);
+//	m_receiverExisted = m_s.isTouched(m_receiver);
+	if (m_sealEngine.evmSchedule(m_envInfo).emptinessIsNonexistence())
+		m_receiverExisted = m_s.accountNonemptyAndExisting(m_receiver);
+	else
+		m_receiverExisted = m_s.addressInUse(m_receiver);
 
 	// Transfer ether.
 	clog(ExecutiveWarnChannel) << "Transfer " <<  m_sender << m_receiver << m_valueTransfer;
@@ -507,8 +511,9 @@ void Executive::revert(NonceRevertPolicy _nonceRevertPolicy)
 		m_s.kill(m_newAddress);
 		m_newAddress = {};
 	}
-	// FIXME:
 	else if (!m_receiverExisted)
-//		m_s.kill(m_receiver);
-		assert(false);
+	{
+		clog(ExecutiveWarnChannel) << "Kill " << m_receiver;
+		m_s.untouch(m_receiver);
+	}
 }

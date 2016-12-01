@@ -80,12 +80,7 @@ public:
 	}
 
 	/// Suicide the associated contract to the given address.
-	virtual void suicide(Address _a) override final
-	{
-		m_s.addBalance(_a, m_s.balance(myAddress));
-		m_s.subBalance(myAddress, m_s.balance(myAddress));
-		ExtVMFace::suicide(_a);
-	}
+	virtual void suicide(Address _a) override final;
 
 	/// Revert any changes made (by any of the other calls).
 	/// @TODO check call site for the parent manifest being discarded.
@@ -102,6 +97,7 @@ private:
 	std::unordered_map<u256, u256> m_origStorage;
 	std::vector<Executive> m_successfulCalls;
 	unsigned m_nonceInc = 0;
+	Address m_selfdestructBeneficiary;
 };
 
 }

@@ -145,6 +145,19 @@ h160 ExtVM::create(u256 _endowment, u256& io_gas, bytesConstRef _code, OnOpFunc 
 	return e.newAddress();
 }
 
+void ExtVM::suicide(Address _a)
+{
+	// FIXME: What if _a is 0?
+	if (!m_s.isTouched(_a))
+	{
+		clog(ExecutiveWarnChannel) << "Log SELFDESTRUCT  " << myAddress << _a;
+		m_selfdestructBeneficiary = _a;
+	}
+	m_s.addBalance(_a, m_s.balance(myAddress));
+	m_s.subBalance(myAddress, m_s.balance(myAddress));
+	ExtVMFace::suicide(_a);
+}
+
 void ExtVM::revert()
 {
 	clog(ExecutiveWarnChannel) << "Reverting " << myAddress;
@@ -164,6 +177,12 @@ void ExtVM::revert()
 		clog(ExecutiveWarnChannel) << "REVERT Nonce " << myAddress << m_nonceInc;
 		m_s.revertIncNonce(myAddress);
 		--m_nonceInc;
+	}
+
+	if (m_selfdestructBeneficiary)
+	{
+		clog(ExecutiveWarnChannel) << "REVERT SELFDESTRUCT touch " << myAddress << m_selfdestructBeneficiary;
+		m_s.untouch(m_selfdestructBeneficiary);
 	}
 
 	// Drop substate.

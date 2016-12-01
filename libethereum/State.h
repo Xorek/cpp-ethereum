@@ -162,6 +162,9 @@ public:
 	/// Check if the address is in use.
 	bool addressInUse(Address const& _address) const;
 
+	bool isTouched(Address const& _address) { auto a = account(_address); return !a || a->isDirty(); }
+	void untouch(Address const& _address) { m_cache[_address].untouch(); }
+
 	/// Check if the account exists in the state and is non empty (nonce > 0 || balance > 0 || code nonempty).
 	/// These two notions are equivalent after EIP158.
 	bool accountNonemptyAndExisting(Address const& _address) const;
