@@ -285,7 +285,7 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 		m_gas = _p.gas;
 		if (m_s.addressHasCode(_p.codeAddress))
 		{
-			clog(ExecutiveWarnChannel) << "Call " << _p.receiveAddress;
+//			clog(ExecutiveWarnChannel) << "Call " << _p.receiveAddress;
 			m_outRef = _p.out; // Save ref to expected output buffer to be used in go()
 			bytes const& c = m_s.code(_p.codeAddress);
 			h256 codeHash = m_s.codeHash(_p.codeAddress);
@@ -303,7 +303,7 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
 		m_receiverExisted = m_s.addressInUse(m_receiver);
 
 	// Transfer ether.
-	clog(ExecutiveWarnChannel) << "Transfer " <<  m_sender << m_receiver << m_valueTransfer;
+//	clog(ExecutiveWarnChannel) << "Transfer " <<  m_sender << m_receiver << m_valueTransfer;
 	m_s.transferBalance(m_sender, _p.receiveAddress, _p.valueTransfer);
 
 
@@ -342,7 +342,7 @@ bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _g
 	if (_init.empty())
 		m_s.setCode(m_newAddress, {});
 
-	clog(ExecutiveWarnChannel) << "Create " << m_sender << m_newAddress << m_valueTransfer;
+//	clog(ExecutiveWarnChannel) << "Create " << m_sender << m_newAddress << m_valueTransfer;
 	return !m_ext;
 }
 
@@ -490,7 +490,7 @@ void Executive::finalize()
 
 void Executive::revert(NonceRevertPolicy _nonceRevertPolicy)
 {
-//	clog(ExecutiveWarnChannel) << "Reverting call" << (int)m_ext->myAddress[19];
+////	clog(ExecutiveWarnChannel) << "Reverting call" << (int)m_ext->myAddress[19];
 	if (m_ext)
 		m_ext->revert();
 	if (m_valueTransfer)
@@ -498,22 +498,22 @@ void Executive::revert(NonceRevertPolicy _nonceRevertPolicy)
 		// FIXME: In case of CREATE, not need to revert transfer and storage,
 		// as we are going to kill the whole account.
 		m_s.transferBalance(m_receiver, m_sender, m_valueTransfer);
-		clog(ExecutiveWarnChannel) << "Revert Transfer " << m_receiver << m_sender << m_valueTransfer;
+//		clog(ExecutiveWarnChannel) << "Revert Transfer " << m_receiver << m_sender << m_valueTransfer;
 	}
 	if (m_isCreation)
 	{
 		auto n = m_s.getNonce(m_sender);
-		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
+//		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
 		if (_nonceRevertPolicy == revertNonce)
 			m_s.setNonce(m_sender, n - 1);
 		n = m_s.getNonce(m_sender);
-		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
+//		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
 		m_s.kill(m_newAddress);
 		m_newAddress = {};
 	}
 	else if (!m_receiverExisted)
 	{
-		clog(ExecutiveWarnChannel) << "Kill " << m_receiver;
+//		clog(ExecutiveWarnChannel) << "Kill " << m_receiver;
 		m_s.untouch(m_receiver);
 	}
 }

@@ -122,7 +122,7 @@ void ExtVM::setStore(u256 _n, u256 _v)
 	if (!m_origStorage.count(_n))
 	{
 		m_origStorage.emplace(_n, store(_n));
-		clog(ExecutiveWarnChannel) << "ORIG STORAGE " << myAddress << _n << _v;
+//		clog(ExecutiveWarnChannel) << "ORIG STORAGE " << myAddress << _n << _v;
 	}
 	m_s.setStorage(myAddress, _n, _v);
 }
@@ -150,7 +150,7 @@ void ExtVM::suicide(Address _a)
 	// FIXME: What if _a is 0?
 	if (!m_s.isTouched(_a))
 	{
-		clog(ExecutiveWarnChannel) << "Log SELFDESTRUCT  " << myAddress << _a;
+//		clog(ExecutiveWarnChannel) << "Log SELFDESTRUCT  " << myAddress << _a;
 		m_selfdestructBeneficiary = _a;
 	}
 	m_s.addBalance(_a, m_s.balance(myAddress));
@@ -160,32 +160,32 @@ void ExtVM::suicide(Address _a)
 
 void ExtVM::revert()
 {
-	clog(ExecutiveWarnChannel) << "Reverting " << myAddress;
+//	clog(ExecutiveWarnChannel) << "Reverting " << myAddress;
 	for (auto it = m_successfulCalls.rbegin(); it != m_successfulCalls.rend(); ++it)
 		it->revert(keepNonce);
 
 	// Restore original storage for this account. The order does not matter.
-	clog(ExecutiveWarnChannel) << "Reverting storage " << myAddress;
+//	clog(ExecutiveWarnChannel) << "Reverting storage " << myAddress;
 	for (auto& item: m_origStorage)
 	{
 		m_s.setStorage(myAddress, item.first, item.second);
-		clog(ExecutiveWarnChannel) << "REVERT STORAGE " << myAddress << item.first << item.second;
+//		clog(ExecutiveWarnChannel) << "REVERT STORAGE " << myAddress << item.first << item.second;
 	}
 
 	while (m_nonceInc)
 	{
-		clog(ExecutiveWarnChannel) << "REVERT Nonce " << myAddress << m_nonceInc;
+//		clog(ExecutiveWarnChannel) << "REVERT Nonce " << myAddress << m_nonceInc;
 		m_s.revertIncNonce(myAddress);
 		--m_nonceInc;
 	}
 
 	if (m_selfdestructBeneficiary)
 	{
-		clog(ExecutiveWarnChannel) << "REVERT SELFDESTRUCT touch " << myAddress << m_selfdestructBeneficiary;
+//		clog(ExecutiveWarnChannel) << "REVERT SELFDESTRUCT touch " << myAddress << m_selfdestructBeneficiary;
 		m_s.untouch(m_selfdestructBeneficiary);
 	}
 
 	// Drop substate.
 	sub.clear();
-	clog(ExecutiveWarnChannel) << "Reverted storage " << myAddress;
+//	clog(ExecutiveWarnChannel) << "Reverted storage " << myAddress;
 }
