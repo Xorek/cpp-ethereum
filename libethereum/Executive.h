@@ -79,13 +79,6 @@ private:
 };
 
 
-enum NonceRevertPolicy: bool
-{
-	keepNonce,
-	revertNonce
-};
-
-
 /**
  * @brief Message-call/contract-creation executor; useful for executing transactions.
  *
@@ -189,7 +182,7 @@ public:
 	void setResultRecipient(ExecutionResult& _res) { m_res = &_res; }
 
 	/// Revert all changes made to the state by this execution.
-	void revert(NonceRevertPolicy _nonceRevertPolicy);
+	void revert();
 
 private:
 	State& m_s;							///< The state to which this operation/transaction is applied.

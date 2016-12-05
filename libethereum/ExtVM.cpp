@@ -162,7 +162,7 @@ void ExtVM::revert()
 {
 //	clog(ExecutiveWarnChannel) << "Reverting " << myAddress;
 	for (auto it = m_successfulCalls.rbegin(); it != m_successfulCalls.rend(); ++it)
-		it->revert(keepNonce);
+		it->revert();
 
 	// Restore original storage for this account. The order does not matter.
 //	clog(ExecutiveWarnChannel) << "Reverting storage " << myAddress;

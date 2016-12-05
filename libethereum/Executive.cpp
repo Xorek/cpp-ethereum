@@ -424,7 +424,7 @@ bool Executive::go(OnOpFunc const& _onOp)
 			clog(StateSafeExceptions) << "Safe VM Exception. " << diagnostic_information(_e);
 			m_gas = 0;
 			m_excepted = toTransactionException(_e);
-			revert(keepNonce);
+			revert();
 		}
 		catch (Exception const& _e)
 		{
@@ -488,7 +488,7 @@ void Executive::finalize()
 	}
 }
 
-void Executive::revert(NonceRevertPolicy _nonceRevertPolicy)
+void Executive::revert()
 {
 ////	clog(ExecutiveWarnChannel) << "Reverting call" << (int)m_ext->myAddress[19];
 	if (m_ext)
@@ -504,8 +504,6 @@ void Executive::revert(NonceRevertPolicy _nonceRevertPolicy)
 	{
 		auto n = m_s.getNonce(m_sender);
 //		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
-		if (_nonceRevertPolicy == revertNonce)
-			m_s.setNonce(m_sender, n - 1);
 		n = m_s.getNonce(m_sender);
 //		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
 		m_s.kill(m_newAddress);
