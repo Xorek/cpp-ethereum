@@ -209,6 +209,7 @@ private:
 	Address m_sender;
 	Address m_receiver;
 	u256 m_valueTransfer;
+	u256 m_origBalance;
 	bool m_receiverExisted = false;
 };
 

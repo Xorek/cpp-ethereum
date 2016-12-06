@@ -335,6 +335,7 @@ bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _g
 	// Remember the transfer params in case revert is needed.
 	m_receiver = m_newAddress;  // FIXME: Merge m_receiver and m_newAddress
 	m_valueTransfer = _endowment;
+	m_origBalance = m_s.balance(m_newAddress);
 
 	// Transfer ether.
 	m_s.transferBalance(m_sender, m_receiver, m_valueTransfer);
@@ -507,6 +508,11 @@ void Executive::revert()
 		n = m_s.getNonce(m_sender);
 //		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
 		m_s.kill(m_newAddress);
+		if (m_origBalance)
+		{
+			clog(ExecutiveWarnChannel) << "Revert CREATE balance " << m_newAddress << m_origBalance;
+			m_s.addBalance(m_newAddress, m_origBalance);
+		}
 		m_newAddress = {};
 	}
 	else if (!m_receiverExisted)
