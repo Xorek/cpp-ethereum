@@ -172,12 +172,9 @@ void ExtVM::revert()
 //		clog(ExecutiveWarnChannel) << "REVERT STORAGE " << myAddress << item.first << item.second;
 	}
 
-	while (m_nonceInc)
-	{
-//		clog(ExecutiveWarnChannel) << "REVERT Nonce " << myAddress << m_nonceInc;
-		m_s.revertIncNonce(myAddress);
-		--m_nonceInc;
-	}
+	// Revert nonce if dumped.
+	if (m_nonceInc > 0)
+		m_s.setNonce(myAddress, m_s.getNonce(myAddress) - m_nonceInc);
 
 	if (m_selfdestructBeneficiary)
 	{

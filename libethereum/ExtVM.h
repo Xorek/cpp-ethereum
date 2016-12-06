@@ -96,7 +96,7 @@ private:
 	SealEngineFace const& m_sealEngine;
 	std::unordered_map<u256, u256> m_origStorage;
 	std::vector<Executive> m_successfulCalls;
-	unsigned m_nonceInc = 0;
+	int m_nonceInc = 0;
 	Address m_selfdestructBeneficiary;
 };
 
