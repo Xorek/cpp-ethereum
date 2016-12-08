@@ -323,6 +323,7 @@ bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _g
 	// We can allow for the reverted state (i.e. that with which m_ext is constructed) to contain the m_newAddress, since
 	// we delete it explicitly if we decide we need to revert.
 	m_newAddress = right160(sha3(rlpList(_sender, nonce)));
+	m_alive = m_s.isAlive(m_newAddress);
 	m_gas = _gas;
 
 	// Execute _init.
@@ -335,7 +336,6 @@ bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _g
 	// Remember the transfer params in case revert is needed.
 	m_receiver = m_newAddress;  // FIXME: Merge m_receiver and m_newAddress
 	m_valueTransfer = _endowment;
-	m_origBalance = m_s.balance(m_newAddress);
 
 	// Transfer ether.
 	m_s.transferBalance(m_sender, m_receiver, m_valueTransfer);
@@ -498,21 +498,24 @@ void Executive::revert()
 	{
 		// FIXME: In case of CREATE, not need to revert transfer and storage,
 		// as we are going to kill the whole account.
+		auto b = m_s.balance(m_receiver);
 		m_s.transferBalance(m_receiver, m_sender, m_valueTransfer);
-//		clog(ExecutiveWarnChannel) << "Revert Transfer " << m_receiver << m_sender << m_valueTransfer;
+		clog(ExecutiveWarnChannel) << "Revert Transfer " << m_receiver << b << m_sender << m_valueTransfer;
 	}
 	if (m_isCreation)
 	{
-		auto n = m_s.getNonce(m_sender);
-//		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
-		n = m_s.getNonce(m_sender);
-//		clog(ExecutiveWarnChannel) << "Revert CREATE " << m_sender << n;
-		m_s.kill(m_newAddress);
-		if (m_origBalance)
+		if (m_alive)
 		{
-			clog(ExecutiveWarnChannel) << "Revert CREATE balance " << m_newAddress << m_origBalance;
-			m_s.addBalance(m_newAddress, m_origBalance);
+			// The the account was alive before CREATE (prefund) we have to
+			// reset some params. This is not very precise but should work in
+			// real live networks where we don't anticipate hash collisions.
+			m_s.setNonce(m_newAddress, 0);
+			m_s.setCode(m_newAddress, {});
+			m_s.clearStorage(m_newAddress);
 		}
+		else
+			// If the account was not existing before we can safely kill it.
+			m_s.kill(m_newAddress);
 		m_newAddress = {};
 	}
 	else if (!m_receiverExisted)
